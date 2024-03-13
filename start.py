@@ -8,7 +8,7 @@ import time
 import codecs
 from datetime import datetime
 
-host_name = '.1cfresh.dev'
+host_name = '.1cfresh-dev.ru'
 sup_password = '123Qwer'
 new_server = False
 global_debug = False

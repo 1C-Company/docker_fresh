@@ -51,8 +51,8 @@ services:
       - forum 
   s3:
     image: minio/minio:latest
-    hostname: s3.1cfresh.dev
-    container_name: s3.1cfresh.dev
+    hostname: s3.1cfresh-dev.ru
+    container_name: s3.1cfresh-dev.ru
     volumes:
       - ./artifacts/s3:/data
     environment:
