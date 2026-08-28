@@ -1,13 +1,21 @@
-FROM tomcat:7.0-jre8-alpine
+FROM bellsoft/liberica-openjdk-debian:17
 
-ENV JAVA_OPTS "${JAVA_OPTS} -Xms512m -Xmx1024m -XX:+UseParallelGC -server "
+COPY ./images/site/distr/site/ROOT.war /usr/share/site/site.war
 
-RUN rm -rf /usr/local/tomcat/webapps/* && \
-    mkdir -p /var/www/content/searchIndex \
-    mkdir -p /var/www/content/site_files
+ENV \
+    JAVA_OPTS="-Xmx256M" \
+    SERVER_PORT=8080 \
+    MANAGEMENT_SERVER_PORT=8081 \
+    SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/site?ApplicationName=site \
+    SPRING_DATASOURCE_USERNAME=postgres \
+    SPRING_DATASOURCE_PASSWORD=postgres \
+    LOGGING_FILE_PATH=/var/log/site/ \
+    SERVER_TOMCAT_ACCESSLOG_ENABLED=TRUE \
+    SERVER_TOMCAT_ACCESSLOG_DIRECTORY=/var/log/site/
 
-COPY ./distr/site/ROOT.war /usr/local/tomcat/webapps/
+RUN \
+    apt-get -y update ;\
+    apt-get -y upgrade ;\
+    apt-get -y install wget
 
-EXPOSE 8080
-
-CMD ["catalina.sh", "run"]
+CMD java $JAVA_OPTS -jar /usr/share/site/site.war

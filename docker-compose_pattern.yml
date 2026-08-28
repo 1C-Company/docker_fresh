@@ -1,24 +1,22 @@
-version: '3.6'
-
 services:
 
   db:
     image: fresh/db
+    platform: linux/amd64
     hostname: db.HOSTNAMEREPLACE
     container_name: db.HOSTNAMEREPLACE
     volumes:
-      - 1c_pg_data:/var/lib/1c/pgdata
-      - 1c_pg_socket:/tmp/postgresql/socket
+      - 1c_pg_data:/var/lib/postgresql/data
       - ./mnt:/mnt
       - ../images/site/create_db.psql:/create_db_site.psql
       - ../images/forum/create_db.psql:/create_db_forum.psql
       - ../images/db/wait_postgres.sh:/wait_postgres.sh
-  
+
   nginx:
     image: nginx:stable-alpine
     hostname: nginx.HOSTNAMEREPLACE
     container_name: nginx.HOSTNAMEREPLACE
-    networks: 
+    networks:
       default:
         aliases:
           - HOSTNAMEREPLACE
@@ -40,7 +38,7 @@ services:
       - ./artifacts/nginx/conf/1c_upstream.conf:/etc/nginx/1c_upstream.conf
       - ./artifacts/nginx/conf/nginx.conf:/etc/nginx/nginx.conf
       - ./artifacts/nginx/conf/conf.d/local-ssl.conf:/etc/nginx/conf.d/local-ssl.conf
-      - ./artifacts/nginx/conf/conf.d/local.conf://etc/nginx/conf.d/local.conf
+      - ./artifacts/nginx/conf/conf.d/local.conf:/etc/nginx/conf.d/local.conf
       - ./artifacts/nginx/log:/var/log/nginx
       - ./mnt:/mnt
       - ../certs/fullchain.pem:/etc/pki-custom/fullchain.crt
@@ -48,7 +46,7 @@ services:
       - ../images/site/distr/site/media:/var/www/content/media/
     depends_on:
       - site
-      - forum 
+      - forum
   s3:
     image: minio/minio:latest
     hostname: s3.1cfresh-dev.ru
@@ -64,21 +62,28 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-      
+
   srv:
     image: fresh/core
+    platform: linux/amd64
     hostname: srv.HOSTNAMEREPLACE
     container_name: srv.HOSTNAMEREPLACE
-    command: srv+cli
+    command: sh /server.sh srv+cli
+    environment:
+      - DATA_1C=/var/lib/1c/data
+      - LOGS_1C=/var/log/1c
+      - DISPLAY=:99
+      - AGENT_PORT=1540
+      - AGENT_REGPORT=1541
+      - AGENT_RANGE=1560:1591
+      - CONTAINER_NAME=srv
     volumes:
-      - 1c_pg_socket:/tmp/postgresql/socket
       - 1c_server_data:/var/lib/1c/data
       - ./artifacts/srv/log:/var/log/1c
       - ./mnt:/mnt
       - /tmp/.aksusb:/tmp/.aksusb
       - ../licenses_1c:/var/1C/licenses
       - ../conf/core:PATH_TO_1C_REPLACEconf
-      
     ports:
       - 1540-1541:1540-1541
       - 1538:1538
@@ -90,34 +95,56 @@ services:
 
   ras:
     image: fresh/core
+    platform: linux/amd64
     hostname: ras.HOSTNAMEREPLACE
     container_name: ras.HOSTNAMEREPLACE
     command: PATH_TO_1C_REPLACEras cluster --port=1545 srv:1540
+    environment:
+      - CONTAINER_NAME=ras
     volumes:
       - ./artifacts/ras/log:/var/log/1c
       - ./mnt:/mnt
       - ../images/core/conf/logcfg.xml:PATH_TO_1C_REPLACEconf/logcfg.xml
     ports:
       - 1545:1545
-      
+
   web:
     image: fresh/core
+    platform: linux/amd64
     hostname: web.HOSTNAMEREPLACE
     container_name: web.HOSTNAMEREPLACE
-    command: web
+    command: apache2ctl -D FOREGROUND
+    environment:
+      - CONTAINER_NAME=web
     volumes:
       - ./artifacts/web/log:/var/log/1c
       - ./artifacts/web/www/a/:/var/www/a/
       - ./artifacts/web/www/int/:/var/www/int/
-      - ./artifacts/web/conf/httpd.conf:/etc/httpd/conf/httpd.conf
+      - ./artifacts/web/conf/apache2.conf:/etc/apache2/apache2.conf
       - ./mnt:/mnt
     depends_on:
       - srv
-  
+
+  cs:
+    image: fresh/cs
+    platform: linux/amd64
+    hostname: cs.HOSTNAMEREPLACE
+    container_name: cs.HOSTNAMEREPLACE
+    volumes:
+      - cs_data:/var/cs
+    environment:
+      - JAVA_TOOL_OPTIONS=-Xmx1024m
+
   site:
     image: fresh/site
+    platform: linux/amd64
     hostname: site.HOSTNAMEREPLACE
     container_name: site.HOSTNAMEREPLACE
+    environment:
+      JAVA_OPTS: -Xmx256M -XX:+UseSerialGC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5005
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/site?ApplicationName=site
+      SPRING_DATASOURCE_USERNAME: site
+      SPRING_DATASOURCE_PASSWORD: 12345Qwerty
     volumes:
       - ./artifacts/site/searchIndex:/var/www/content/searchIndex
       - ./artifacts/site/site_files:/var/www/content/site_files
@@ -132,6 +159,7 @@ services:
 
   forum:
     image: fresh/forum
+    platform: linux/amd64
     hostname: forum.HOSTNAMEREPLACE
     container_name: forum.HOSTNAMEREPLACE
     volumes:
@@ -145,14 +173,29 @@ services:
 
   gate:
     image: fresh/gate
+    platform: linux/amd64
     hostname: gate.HOSTNAMEREPLACE
     container_name: gate.HOSTNAMEREPLACE
-    volumes: 
+    volumes:
       - ./mnt:/mnt
     depends_on:
       - srv
 
-volumes: 
+  esb:
+    image: fresh/esb
+    platform: linux/amd64
+    hostname: esb.HOSTNAMEREPLACE
+    container_name: esb.HOSTNAMEREPLACE
+    ports:
+      - 9090:9090
+    volumes:
+      - ./artifacts/esb/data:/var/opt/1C/1CE/instances/1c-enterprise-esb
+      - ./mnt:/mnt
+    environment:
+      - JAVA_TOOL_OPTIONS=-Xmx1024m
+
+
+volumes:
   1c_pg_data:
-  1c_pg_socket:
   1c_server_data:
+  cs_data:

@@ -5,7 +5,6 @@ import sys
 import json
 import threading
 import time
-import codecs
 from datetime import datetime
 
 host_name = '.1cfresh-dev.ru'
@@ -13,7 +12,6 @@ sup_password = '123Qwer'
 new_server = False
 global_debug = False
 info_base_list = []
-configurations = {}
 
 docker_run_str = 'docker run --rm -v {}:/out_files alpine'.format(helper.this_path)
 docker_compose_str = 'docker-compose -f workdir/docker-compose.yml '
@@ -21,7 +19,7 @@ docker_compose_str = 'docker-compose -f workdir/docker-compose.yml '
 work_dir = '/out_files/workdir/'
 work_dir_other = work_dir + 'mnt/other-files/'
 local_work_dir = helper.replace_sep(helper.this_path + 'workdir/')
-path_to_1c = ''
+path_to_1c = '/opt/1c/'
 
 
 class colors:
@@ -54,13 +52,13 @@ class ProgressThread(threading.Thread):
 
     def _spin(self):
 
-        while not self._stopevent.isSet():
+        while not self._stopevent.is_set():
             for t in ['   ', '.  ', '.. ', '...']:
                 print(self.desc, t, end='\r')
                 time.sleep(0.5)
 
 class DoThread(threading.Thread):
-    
+
     is_good = False
     def run(self):
         try:
@@ -82,16 +80,16 @@ def print_description(function_to_decorate):
             desc = ''
 
         all_desc = function_to_decorate.__doc__ + desc
-        
+
         task = DoThread(target=function_to_decorate, args=args, kwargs=kwargs)
         task.start()
 
         progress_thread = ProgressThread(all_desc)
         progress_thread.start()
-        
+
         task.join()
         progress_thread.stop()
-    
+
         while progress_thread.is_alive():
             time.sleep(0.2)
 
@@ -135,7 +133,7 @@ def call(command, remote=True, debug=False, action='', measure_duration=False, s
 def get_configurations_data():
     """Get configuration data"""
     is_fail = False
-    with codecs.open('other_files/params.json', 'r', 'utf-8') as json_file:
+    with open('other_files/params.json', 'r', encoding='utf-8') as json_file:
         data = json.load(json_file)
         for ib_data in data['ИнформационныеБазы']:
             if not os.path.isfile('distr/{}'.format(ib_data['ИмяФайлаКонфигурации'])):
@@ -160,10 +158,17 @@ def prepare_new_ib(ib_name, int_name, conf_file_name, job_block):
     job_dn_str = 'Y' if job_block else 'N'
 
     action = 'create_ib'
-    result = call(' '.join(helper.create_ib_command(host_name, ib_name, conf_file_name, job_dn_str, action)),
+    result = call(' '.join(helper.create_ib_command(host_name, ib_name, job_dn_str, action)),
          remote=False,
          action='Creating ' + ib_name,
          measure_duration=True)
+    check_call_work(result, action, ib_name)
+
+    action = 'load_config'
+    result = call(' '.join(helper.load_cfg_command(host_name, ib_name, conf_file_name, action)),
+            remote=False,
+            action='Loading configuration to ' + ib_name,
+            measure_duration=True)
     check_call_work(result, action, ib_name)
 
     action = 'install_control_ext'
@@ -191,7 +196,7 @@ def prepare_new_ib(ib_name, int_name, conf_file_name, job_block):
             measure_duration=True)
         check_call_work(result, action, ib_name)
     else:
-        post_data = ''    
+        post_data = ''
 
     action = 'disable_safe_mode'
     result = call(' '.join(helper.disable_safe_mode(host_name, ib_name, action)),
@@ -207,21 +212,13 @@ def prepare_new_ib(ib_name, int_name, conf_file_name, job_block):
          measure_duration=True)
 
 @print_description
-def delete_volumes():
-    """Delete volumes"""
-
-    call('docker volume rm workdir_1c_pg_data', remote=False)
-    call('docker volume rm workdir_1c_pg_socket', remote=False)
-    call('docker volume rm workdir_1c_server_data', remote=False)
-
-@print_description
 def prepare_bases():
     """Prepare all bases"""
 
     sm_ib = None
 
     for ib_data in info_base_list:
-        if ib_data[ib_prop.name] == 'sm': 
+        if ib_data[ib_prop.name] == 'sm':
             sm_ib = ib_data
             continue
         prepare_new_ib(
@@ -232,16 +229,16 @@ def prepare_bases():
         )
         if ib_data[ib_prop.job]:
             enable_job(ib_data[ib_prop.name], ib_data[ib_prop.adm])
-    
-    # prepare sm base 
+
+    # prepare sm base
     prepare_new_ib(
             ib_name=sm_ib[ib_prop.name],
             int_name=sm_ib[ib_prop.int_name],
             conf_file_name=sm_ib[ib_prop.conf_file],
             job_block=sm_ib[ib_prop.job]
         )
-    if ib_prop.job:
-            enable_job(ib_data[ib_prop.name], ib_data[ib_prop.adm])    
+    if sm_ib[ib_prop.job]:
+            enable_job(sm_ib[ib_prop.name], sm_ib[ib_prop.adm])
 
 @print_description
 def renew_nginx_files():
@@ -262,12 +259,12 @@ def renew_nginx_files():
 
 @print_description
 def renew_workdir():
-    """Renew wordir"""
-    
+    """Renew workdir"""
+
     call('rm -rf /out_files/workdir')
     call('mkdir -p {}mnt'.format(work_dir))
     call('mkdir -p {}artifacts/web/conf'.format(work_dir))
-    call('sh -c "cp /out_files/conf/web/httpd.conf {}artifacts/web/conf/httpd.conf"'.format(work_dir))
+    call('sh -c "cp /out_files/conf/web/apache2.conf {}artifacts/web/conf/apache2.conf"'.format(work_dir))
     call('sh -c "cp /out_files/distr/*.cf {}mnt/"'.format(work_dir))
     call('sh -c "cp /out_files/distr/*.cfe {}mnt/"'.format(work_dir))
 
@@ -278,7 +275,7 @@ def renew_docker_compose():
 
     call('cp /out_files/docker-compose_pattern.yml /out_files/workdir/docker-compose.yml')
     call('sh -c "sed -i \'s/HOSTNAMEREPLACE/{}/\' {}/*.yml"'.format(host_name, work_dir))
-    call('sh -c "sed -i \'s/PATH_TO_1C_REPLACE/{}/\' {}/*.yml"'.format(path_to_1c.replace('/','\/'), work_dir))
+    call('sh -c "sed -i \'s/PATH_TO_1C_REPLACE/{}/\' {}/*.yml"'.format(path_to_1c.replace('/','\\/'), work_dir))
 
 
 @print_description
@@ -292,13 +289,24 @@ def renew_other_files():
 
 @print_description
 def create_bucket():
-    """Create new bucket to 1C"""
+    """Create new bucket for 1C"""
 
     call('mkdir /out_files/workdir/artifacts/s3/files')
 
 @print_description
-def publish_sevises():
+def publish_services():
     """Publish services"""
+
+    start = time.time()
+    timeout = 120
+    while True:
+        result = call('docker exec web.{} curl -s http://localhost/ > /dev/null'.format(host_name), remote=False, )
+        if result == 0:
+            break
+        if time.time() - start > timeout:
+            print(colors.RED, 'Timeout waiting for web service to become available', colors.WHITE)
+            exit(1)
+        time.sleep(2)
 
     for ib_data in info_base_list:
         if ib_data[ib_prop.a_name] != '':
@@ -315,19 +323,17 @@ def publish_sevises():
             internal=True,
             descriptor=ib_data[ib_prop.int_desc],
             base_name=ib_data[ib_prop.name])), remote=False)
-    
+
     # publish special services
     call(' '.join(helper.web_publish_command(
-        host_name, 'openid', False, 'openid', 'sm')), remote=False)    
+        host_name, 'openid', False, 'openid', 'sm')), remote=False)
     call(' '.join(helper.web_publish_command(host_name, 'sc', True,
         'sessioncontrol', 'sm;Usr=SessionControl;Pwd=' + sup_password)), remote=False)
     call(' '.join(helper.web_publish_command(host_name, 'extreg', True,
         'extreg', 'sm;Usr=ExtReg;Pwd=' + sup_password)), remote=False)
 
     # restart Apache
-    call('docker exec web.{} chown -R usr1cv8:grp1cv8 /var/www'.format(host_name), remote=False)
-    call('docker exec web.{} httpd -k graceful'.format(host_name), remote=False)
-
+    call('docker exec web.{} /usr/sbin/apachectl graceful'.format(host_name), remote=False)
 
 @print_description
 def set_full_host_name(is_new):
@@ -383,7 +389,6 @@ def configurate_site():
     """Configurate site settings"""
 
     call(' '.join(helper.edit_site_settings(host_name, sup_password)), remote=False)
-    call('docker exec -t web.{0} curl https://{0}/settings/finish_configuration'.format(host_name), remote=False)
     call(' '.join(helper.enable_manual_registration(host_name)), remote=False)
     call(' '.join(helper.enable_openid(host_name)), remote=False)
     call(' '.join(helper.add_solution(
@@ -395,6 +400,7 @@ def configurate_site():
         possibilities='"БТС"',
         title='"Библиотека технологии сервиса"'
     )), remote=False)
+    call('docker exec -t web.{0} curl https://{0}/settings/finish_configuration'.format(host_name), remote=False)
 
 
 @print_description
@@ -420,25 +426,14 @@ def wait_site():
 
 def enable_job(base_name, user):
 
-    call('docker exec -t ras.{} deployka scheduledjobs unlock -db {} -db-user "{}"'.format(host_name, base_name, user),
+    call('docker exec -t ras.{} deployka scheduledjobs unlock -rac /opt/1c/rac -db {} -db-user "{}" '.format(host_name, base_name, user),
         remote=False)
 
 @print_description
 def down_containers():
-    """Down all conteiners"""
+    """Down all containers and remove volumes"""
 
-    call(docker_compose_str + 'down', remote=False)
-
-@print_description
-def get_path_to_1c():
-    """Getting path to 1C"""
-
-    global path_to_1c
-    cmd = "docker run --rm fresh/core sh -c \"find / -name '1cv8c' | sed 's/1cv8c//g'\""
-    pipe = subprocess.PIPE
-    p = subprocess.Popen(cmd, shell=True, stdin=pipe, stdout=pipe, stderr=pipe, close_fds=True)
-    path_to_1c = p.stdout.read().decode('utf-8').strip()
-    print('path to 1C: ' + path_to_1c)
+    call(docker_compose_str + 'down -v', remote=False)
 
 global_start_time = datetime.now()
 print('{}Fresh is starting{} at {}'.format(colors.GREEN, colors.WHITE, global_start_time))
@@ -448,7 +443,6 @@ new_server = '-new' in sys.argv
 global_debug = '-debug' in sys.argv
 
 set_full_host_name(new_server)
-get_path_to_1c()
 helper.init(path_to_1c)
 
 if new_server:
@@ -457,20 +451,19 @@ if new_server:
     renew_nginx_files()
     renew_docker_compose()
     renew_other_files()
-    delete_volumes()
 
-# start db srv ras web gate conteiners
-call(docker_compose_str + 'up -d db srv ras web gate s3', remote=False, silent=False)
+# start db srv ras web gate containers
+call(docker_compose_str + 'up -d db srv ras web gate s3 cs esb', remote=False, silent=False)
 wait_postgres()
 
 if new_server:
     create_bucket()
-    publish_sevises()
+    publish_services()
     prepare_bases()
     create_db_site()
     create_db_forum()
 
-# start site forum nginx conteiners
+# start site forum nginx containers
 call(docker_compose_str + 'up -d nginx site', remote=False, silent=False)
 wait_site()
 

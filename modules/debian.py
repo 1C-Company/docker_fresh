@@ -7,5 +7,5 @@ class New():
     commands_after = []
 
     def __init__(self):
-        self.name = 'db'
+        self.name = 'debian'
         self.commands_before = []

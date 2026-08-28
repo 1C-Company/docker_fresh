@@ -10,7 +10,7 @@ distr_path = this_path + 'distr' + sep
 def replace_sep(path):
     return path.replace('/', sep)
 
-def new_docker_command(extra_path=None): 
+def new_docker_command(extra_path=None):
     command = []
     command.append('docker')
     command.append('run')
@@ -37,7 +37,7 @@ def add_command_copy_file_from_mnt_to_tmp(commands, container_name, full_path, f
     commands.append('&&')
 
 def web_publish_command(host_name, conf_name, internal, descriptor, base_name=''):
-    
+
     if internal:
         prefix = 'int'
     else:
@@ -60,7 +60,7 @@ def web_publish_command(host_name, conf_name, internal, descriptor, base_name=''
     else:
         command.append('"Srvr=srv;Ref={};"'.format(conf_name))
     command.append('-confpath')
-    command.append('"/etc/httpd/conf/httpd.conf"')
+    command.append('"/etc/apache2/apache2.conf"')
     command.append('-descriptor')
     command.append('"/mnt/other-files/vrd/{}.vrd"'.format(descriptor))
     return command
@@ -68,11 +68,26 @@ def web_publish_command(host_name, conf_name, internal, descriptor, base_name=''
 def get_out_file_name_command(action, ib_name):
     return '/Out "/mnt/{}_{}.out"'.format(action, ib_name)
 
-def create_ib_command(host_name, ib_name, file_name, job_block, action):
-    
+def create_ib_command(host_name, ib_name, job_block, action):
+
+    container_name = 'srv.{}'.format(host_name)
+
+    command = []
+    command.append('docker')
+    command.append('exec')
+    command.append('-t')
+    command.append(container_name)
+    command.append('{}1cv8'.format(path_to_1c))
+    command.append('CREATEINFOBASE')
+    command.append('"Srvr=srv;Ref={0};DBMS=PostgreSQL;DBSrvr=db;DB={0};DBUID=postgres;LicDstr=Y;Locale=ru_RU;CrSQLDB=Y;SchJobDn={1};"'.format(ib_name, job_block))
+    command.append(get_out_file_name_command(action, ib_name))
+    return command
+
+def load_cfg_command(host_name, ib_name, file_name, action):
+
     full_path = '/mnt/{}'.format(file_name)
     container_name = 'srv.{}'.format(host_name)
-    
+
     command = []
     add_command_copy_file_from_mnt_to_tmp(command, container_name, full_path, file_name)
     command.append('docker')
@@ -80,16 +95,17 @@ def create_ib_command(host_name, ib_name, file_name, job_block, action):
     command.append('-t')
     command.append(container_name)
     command.append('{}1cv8'.format(path_to_1c))
-    command.append('CREATEINFOBASE')
-    command.append('"Srvr=srv;Ref={0};DBMS=PostgreSQL;DBSrvr=/tmp/postgresql/socket;DB={0};DBUID=postgres;LicDstr=Y;Locale=ru_RU;CrSQLDB=Y;SchJobDn={1};"'.format(
-        ib_name, job_block))
-    command.append('/UseTemplate')
+    command.append('DESIGNER')
+    command.append('/S')
+    command.append('"srv\\{}"'.format(ib_name))
+    command.append('/LoadCfg')
     command.append('/tmp/{}'.format(file_name))
+    command.append('/UpdateDBCfg')
     command.append(get_out_file_name_command(action, ib_name))
     return command
 
 def install_control_ext_command(host_name, ib_name, action):
-    
+
     full_path = '/mnt/other-files/cfe/api_1cfresh.cfe'
     container_name = 'srv.{}'.format(host_name)
 
@@ -159,10 +175,10 @@ def install_ext_command(host_name, ib_name, action):
     return command
 
 def disable_safe_mode(host_name, ib_name, action):
-    
+
     full_path = '/mnt/other-files/cfe/disable.epf'
     container_name = 'srv.{}'.format(host_name)
-    
+
     command = []
     add_command_copy_file_from_mnt_to_tmp(command, container_name, full_path, 'disable.epf')
     command.append('docker')
@@ -170,7 +186,7 @@ def disable_safe_mode(host_name, ib_name, action):
     command.append('-t')
     command.append(container_name)
     command.append('{}1cv8'.format(path_to_1c))
-    command.append('ENTERPRICE')
+    command.append('ENTERPRISE')
     command.append('/S')
     command.append('"srv\\{}"'.format(ib_name))
     command.append('/Execute')
@@ -187,7 +203,7 @@ def delete_control_extension(ib_name, host_name, user):
     command.append('curl')
     if user != None: command.append('--user {}:'.format(user))
     command.append('-X POST')
-    command.append('http://localhost/int/{}/hs/api.1cfresh/delete'.format(ib_name)) 
+    command.append('http://localhost/int/{}/hs/api.1cfresh/delete'.format(ib_name))
     return command
 
 def edit_site_settings(host_name, sup_pass):
@@ -249,14 +265,14 @@ def enable_openid(host_name):
 def add_solution(host_name, brief_desc, full_desc, display_order, id, possibilities, title):
     command = []
     command.append('docker exec -t web.{}'.format(host_name))
-    command.append('curl')  
-    command.append('-F _enableDemo=on') 
-    command.append('-F _showVideo=on') 
-    command.append('-F _userVisible=on') 
-    command.append('-F briefDescription={}'.format(brief_desc)) 
-    command.append('-F displayOrder={}'.format(display_order)) 
-    command.append('-F fullDescription={}'.format(full_desc)) 
-    command.append('-F id={}'.format(id)) 
+    command.append('curl')
+    command.append('-F _enableDemo=on')
+    command.append('-F _showVideo=on')
+    command.append('-F _userVisible=on')
+    command.append('-F briefDescription={}'.format(brief_desc))
+    command.append('-F displayOrder={}'.format(display_order))
+    command.append('-F fullDescription={}'.format(full_desc))
+    command.append('-F id={}'.format(id))
     command.append('-F possibilities={}'.format(possibilities))
     command.append('-F screenshotCount=0')
     command.append('-F title={}'.format(title))

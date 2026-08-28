@@ -1,0 +1,36 @@
+{
+    "components": [
+        {
+            "name": "Менеджер сервиса.",
+            "url": "https://dl03.1c.ru/public/file/get/f51cf109-aeca-43b7-b158-9a3dc303eabc"
+        },
+        {
+            "name": "Агент сервиса.",
+            "url": "https://dl03.1c.ru/public/file/get/8e4cd5b1-b008-4a73-b220-7718b32f887f"
+        },
+        {
+            "name": "Управление службой поддержки.",
+            "url": "https://dl03.1c.ru/public/file/get/662c5307-2096-416c-a0e4-bf55785a17aa"
+        },
+        {
+            "name": "Менеджер доступности.",
+            "url": "https://dl02.1c.ru/public/file/get/e8c75f1e-ea32-472f-8864-08ca9988afbb"
+        },
+        {
+            "name": "Демо приложение 'Работа в модели сервиса'.",
+            "url": "https://dl05.1c.ru/public/file/get/2af30fa1-15cb-4861-9ba0-31396cc49f00"
+        },
+        {
+            "name": "Сайт.",
+            "url": "https://dl04.1c.ru/public/file/get/e9849248-f5c3-4e70-b3b7-c9c5ba54a7c7"
+        },
+        {
+            "name": "Форум.",
+            "url": "https://dl02.1c.ru/public/file/get/8e74ed35-c0ab-4f14-8874-fc6516f9a91a"
+        },
+        {
+            "name": "Шлюз приложений.",
+            "url": "https://dl02.1c.ru/public/file/get/e2969e90-cb7f-437c-803a-f63122fb8292"
+        }
+    ]
+}

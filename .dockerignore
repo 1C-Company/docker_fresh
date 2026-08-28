@@ -1,0 +1,15 @@
+.git
+.gitattributes
+.gitignore
+certs/
+licenses_1c/
+modules/
+other_files/
+conf/
+workdir/
+artifacts/
+mnt/
+*.py
+*.md
+docker-compose*.yml
+requirements.txt
